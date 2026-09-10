@@ -6,17 +6,17 @@
 #   s deploy   # 使用同目录 s.yaml
 #
 # 与仓库根目录原生 Dockerfile 的差异（仅 3 处，均为云函数必需）：
-#   1. 基础镜像由浮动的 node:lts-alpine 钉死为 node:22-alpine
+#   1. 基础镜像由浮动的 node:lts-alpine 钉死为 node:24-alpine
 #      —— 60S 是纯 ESM + 直接 import .ts，依赖 Node 原生类型擦除
-#         （Node 24 为 "strip"，Node 22.18+ 默认开启，Node <= 20 完全不支持）
+#         （Node 24 为 "strip" 且默认开启；Node 22.18+ 亦支持，Node <= 20 完全不支持）
 #   2. 默认 PORT=9000 —— FC / SCF Web 函数固定要求监听 9000
 #   3. COPY .npmrc —— @jsr:registry=https://npm.jsr.io，否则 @oak/oak 装不上
 #
-# 注意：不要使用 node:lts-alpine 等浮动标签，上游将来若回退到 Node 20
+# 注意：不要使用 node:lts-alpine 等浮动标签，上游将来若回退到 Node 20 或更早
 #       会在启动阶段直接失败（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING）。
 
 # ---------- 构建阶段 ----------
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -33,7 +33,7 @@ RUN pnpm install --prod --frozen-lockfile
 COPY . .
 
 # ---------- 运行阶段 ----------
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 
 WORKDIR /app
 
