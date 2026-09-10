@@ -1,0 +1,51 @@
+# 阿里云函数计算（FC）部署描述文件
+# 使用 Serverless Devs：https://github.com/Serverless-Devs/Serverless-Devs
+#
+#   s config    # 配置 AK/SK（首次）
+#   s deploy    # 构建并部署（会自动 docker build & push）
+#
+# 前置：
+#   1. 已在 ACR（容器镜像服务）个人版创建命名空间与仓库
+#   2. 本地已 docker login <registry>
+#   3. 自定义域名为可选但推荐，生产不要用函数测试域名
+
+edition: 3.0.0
+name: sixtys-fc
+access: default
+
+vars:
+  region: cn-hangzhou
+  # 改成你自己的 ACR 地址，例如 registry.cn-hangzhou.aliyuncs.com/<namespace>/60s
+  image: registry.cn-hangzhou.aliyuncs.com/CHANGE_ME/60s:latest
+
+resources:
+  sixtys:
+    component: fc3
+    props:
+      region: ${vars.region}
+      functionName: 60s
+      description: '60S API，每天 60 秒读懂世界'
+      runtime: custom-container
+      # FC Web 函数要求：监听 9000，监听地址 0.0.0.0
+      customContainerConfig:
+        image: ${vars.image}
+        port: 9000
+      # 实测常驻内存 ~136MB，点一次 /v2/lunar 后 ~147MB；512MB 起步，建议 1GB
+      memorySize: 512
+      timeout: 60
+      instanceConcurrency: 10
+      environmentVariables:
+        NODE_ENV: production
+        TZ: Asia/Shanghai
+        HOST: 0.0.0.0
+        PORT: '9000'
+      logConfig:
+        enableRequestMetrics: true
+        logstore: default-logs
+      # 建议为生产绑定自定义域名，不要使用 FC 默认测试域名
+      # triggers:
+      #   - triggerName: httpTrigger
+      #     triggerType: http
+      #     triggerConfig:
+      #       authType: anonymous
+      #       methods: [GET, POST]
