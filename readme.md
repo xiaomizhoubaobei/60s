@@ -117,7 +117,7 @@ npm install && npx wrangler publish
 
 **阿里云函数计算（FC）· 自定义镜像**
 
-> 60S 是纯 ESM + 直接 `import` `.ts`，依赖 Node 原生类型擦除（需 Node 22.18+ / 24），云函数内置 Node 运行时跑不起来，需走自定义镜像。
+> 60S 是纯 ESM + 直接 `import` `.ts`，依赖 Node 原生类型擦除（本方案镜像钉死 Node 24），云函数内置 Node 运行时跑不起来，需走自定义镜像。
 
 仓库已提供 `Dockerfile.fc` 与 `s.yaml`，详见 [docs/deploy-fc.md](./docs/deploy-fc.md)：
 

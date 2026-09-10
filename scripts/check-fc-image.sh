@@ -29,10 +29,12 @@ if grep -nE '^FROM[[:space:]]+node:lts' Dockerfile.fc >/dev/null 2>&1; then
 else
   ok "基础镜像未使用 node:lts 浮动标签"
 fi
-if grep -nE 'node:(22|24)-alpine' Dockerfile.fc >/dev/null 2>&1; then
-  ok "基础镜像已钉死为 Node 22/24"
+if grep -qE 'node:24-alpine' Dockerfile.fc; then
+  ok "基础镜像已钉死为 Node 24"
+elif grep -nE 'node:(22|24)-alpine' Dockerfile.fc >/dev/null 2>&1; then
+  bad "基础镜像未钉死在 Node 24（检测到非 24 的 Node 标签）"
 else
-  bad "基础镜像未钉死 Node 22/24"
+  bad "基础镜像未钉死 Node 24"
 fi
 
 echo "==> 3. 环境变量三件套"
