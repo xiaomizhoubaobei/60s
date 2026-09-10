@@ -11,7 +11,7 @@ import { appRouter } from './router.ts'   // 注意：直接 .ts 后缀
 
 | Node 版本 | 行为 |
 | --- | --- |
-| **Node 24（本方案采用）** | `process.features.typescript === 'strip'` 且默认开启，直接运行 ✅ |
+| **Node 24（本方案采用，完整镜像 `node:24-bookworm`）** | `process.features.typescript === 'strip'` 且默认开启，直接运行 ✅ |
 | Node 22.18 ~ 23 | 默认开启，直接运行 ✅ |
 | Node 22.6 ~ 22.17 | 需加 `--experimental-strip-types` |
 | Node 20 及以下 | **完全不支持** ❌ |
@@ -71,8 +71,9 @@ sh scripts/check-fc-image.sh 60s:local  # 额外做运行时探活
 
 相对仓库根目录的原生 `Dockerfile`，`Dockerfile.fc` 只有 3 处差异：
 
-1. **基础镜像钉死 `node:24-alpine`**
+1. **基础镜像钉死 `node:24-bookworm`（Node 24 完整镜像）**
    原生 `Dockerfile` 用 `node:lts-alpine`，当前解析到 Node 24 能跑，但 `lts` 是**浮动标签**，将来回退到 Node 20 会直接启动失败。必须钉死 `24`（本方案）或 `22.18+`。
+   这里进一步用**完整镜像**（Debian bookworm / glibc）而非 `-alpine`（musl）：与官方 `node:24` 默认发行版一致，规避原生依赖的 libc 差异；镜像自带 `bash` / `git` / `curl` / `python3` / `gcc` / `make`，构建期零额外安装；`tzdata` 也已内置。
 2. **默认 `PORT=9000`**
    FC / SCF Web 函数固定要求监听 `9000`。`src/config.ts` 已支持 `process.env.PORT`，无需改代码。实测默认端口是 `4399`，不覆盖会探活失败。
 3. **依赖安装阶段 `COPY .npmrc`**
@@ -115,7 +116,7 @@ sh scripts/check-fc-image.sh 60s:local  # 额外做运行时探活
 
 ## 6. 构建前自检清单
 
-1. 基础镜像**钉死 Node 24**（或退而求其次 22.18+），禁用 `lts` 浮动标签
+1. 基础镜像**钉死 Node 24 完整镜像 `node:24-bookworm`**（或退而求其次 22.18+），禁用 `lts` 浮动标签
 2. 装依赖阶段 `COPY .npmrc`（否则 `@oak/oak` 装不上）
 3. 用 `pnpm install --prod --frozen-lockfile`，别把 devDeps（typescript / wrangler / bun）打进镜像
 4. 环境变量三件套：`PORT=9000`、`TZ=Asia/Shanghai`、`NODE_ENV=production`
@@ -128,7 +129,7 @@ sh scripts/check-fc-image.sh 60s:local  # 额外做运行时探活
 ## 7. 常见问题
 
 **Q：日志报 `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`？**
-A：Node 版本过低（< 22.18 或 20 及以下）。检查基础镜像是否被浮动标签带到了 Node 20；本方案已钉死 `node:24-alpine`。
+A：Node 版本过低（< 22.18 或 20 及以下）。检查基础镜像是否被浮动标签带到了 Node 20；本方案已钉死 `node:24-bookworm`。
 
 **Q：函数起来了但探活失败 / 502？**
 A：端口不对。FC Web 函数只认 `9000`，且必须监听 `0.0.0.0`（`Dockerfile.fc` 已设 `HOST=0.0.0.0`）。

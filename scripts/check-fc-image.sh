@@ -23,18 +23,31 @@ need package.json
 need pnpm-lock.yaml
 need node.ts
 
-echo "==> 2. 基础镜像不得使用浮动 lts 标签"
+echo "==> 2. 基础镜像必须是 Node 24 完整镜像（node:24-bookworm）"
 if grep -nE '^FROM[[:space:]]+node:lts' Dockerfile.fc >/dev/null 2>&1; then
   bad "Dockerfile.fc 使用了 node:lts（浮动标签，将来可能回退到 Node 20 直接挂）"
 else
   ok "基础镜像未使用 node:lts 浮动标签"
 fi
-if grep -qE 'node:24-alpine' Dockerfile.fc; then
-  ok "基础镜像已钉死为 Node 24"
-elif grep -nE 'node:(22|24)-alpine' Dockerfile.fc >/dev/null 2>&1; then
-  bad "基础镜像未钉死在 Node 24（检测到非 24 的 Node 标签）"
+FROM_N24_FULL="$(grep -cE '^FROM[[:space:]]+node:24-bookworm' Dockerfile.fc || true)"
+if [ "$FROM_N24_FULL" -eq 2 ]; then
+  ok "两个阶段的基础镜像均为 node:24-bookworm（Node 24 完整镜像）"
+elif grep -nE '^FROM[[:space:]]+node:24-alpine' Dockerfile.fc >/dev/null 2>&1; then
+  bad "基础镜像为 node:24-alpine，不是 Node 24 完整镜像（应改为 node:24-bookworm）"
+elif grep -nE '^FROM[[:space:]]+node:(22|24)' Dockerfile.fc >/dev/null 2>&1; then
+  bad "基础镜像未钉死在 node:24-bookworm（Node 24 完整镜像）"
 else
-  bad "基础镜像未钉死 Node 24"
+  bad "基础镜像未钉死 Node 24 完整镜像"
+fi
+if grep -qE '^USER[[:space:]]+node$' Dockerfile.fc; then
+  ok "以非 root 用户 node 运行（官方镜像内置 uid/gid 1000）"
+else
+  bad "未切换到非 root 用户 node"
+fi
+if grep -qE '^COPY --from=builder --chown=node:node' Dockerfile.fc; then
+  ok "产物 chown 到 node:node"
+else
+  bad "COPY --from=builder 未 chown 到 node:node"
 fi
 
 echo "==> 3. 环境变量三件套"
