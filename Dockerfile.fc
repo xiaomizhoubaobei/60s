@@ -6,17 +6,25 @@
 #   s deploy   # 使用同目录 s.yaml
 #
 # 与仓库根目录原生 Dockerfile 的差异（仅 3 处，均为云函数必需）：
-#   1. 基础镜像由浮动的 node:lts-alpine 钉死为 node:24-alpine
+#   1. 基础镜像由浮动的 node:lts-alpine 钉死为 node:24-bookworm（Node 24 完整镜像）
 #      —— 60S 是纯 ESM + 直接 import .ts，依赖 Node 原生类型擦除
 #         （Node 24 为 "strip" 且默认开启；Node 22.18+ 亦支持，Node <= 20 完全不支持）
 #   2. 默认 PORT=9000 —— FC / SCF Web 函数固定要求监听 9000
 #   3. COPY .npmrc —— @jsr:registry=https://npm.jsr.io，否则 @oak/oak 装不上
 #
-# 注意：不要使用 node:lts-alpine 等浮动标签，上游将来若回退到 Node 20 或更早
+# 为什么用「完整镜像」而不是 alpine：
+#   - 与官方 node:24 默认发行版一致（Debian bookworm / glibc），不走 musl，
+#     规避预编译原生依赖在 musl 下的兼容性差异；镜像自带 bash / git / curl /
+#     python3 / gcc / make，构建期无需再装任何工具，行为可复现。
+#   - 代价是基础层变大（压缩后约 390MB，alpine 约 56MB）。FC / SCF 的容器镜像
+#     由 ACR / TCR 拉取，不占函数代码包配额，实测可正常部署；若更在意拉取体积，
+#     把两处 FROM 换成 node:24-alpine 即可（一行改动，其余无需调整）。
+#
+# 注意：不要使用 node:lts 等浮动标签，上游将来若回退到 Node 20 或更早
 #       会在启动阶段直接失败（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING）。
 
 # ---------- 构建阶段 ----------
-FROM node:24-alpine AS builder
+FROM node:24-bookworm AS builder
 
 WORKDIR /app
 
@@ -33,7 +41,7 @@ RUN pnpm install --prod --frozen-lockfile
 COPY . .
 
 # ---------- 运行阶段 ----------
-FROM node:24-alpine AS runner
+FROM node:24-bookworm AS runner
 
 WORKDIR /app
 
@@ -44,13 +52,11 @@ ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=9000
 
-# 非 root 运行
-RUN addgroup -S nodejs && adduser -S nodejs -G nodejs
+# 非 root 运行：官方 node 镜像已内置 uid/gid=1000 的 node 用户，直接复用
+# （alpine 基础镜像没有该用户，之前才需要 addgroup / adduser）
+COPY --from=builder --chown=node:node /app .
 
-# 仅拷贝构建产物（此时 /app 已包含 node_modules，不会重复安装）
-COPY --from=builder --chown=nodejs:nodejs /app .
-
-USER nodejs
+USER node
 
 EXPOSE 9000
 
