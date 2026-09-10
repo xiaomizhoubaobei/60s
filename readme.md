@@ -115,6 +115,18 @@ npm install && node --experimental-strip-types node.ts
 npm install && npx wrangler publish
 ```
 
+**阿里云函数计算（FC）· 自定义镜像**
+
+> 60S 是纯 ESM + 直接 `import` `.ts`，依赖 Node 原生类型擦除（需 Node 22.18+ / 24），云函数内置 Node 运行时跑不起来，需走自定义镜像。
+
+仓库已提供 `Dockerfile.fc` 与 `s.yaml`，详见 [docs/deploy-fc.md](./docs/deploy-fc.md)：
+
+```bash
+docker build -f Dockerfile.fc -t <your-acr>/60s:latest .
+docker push <your-acr>/60s:latest
+s deploy   # Serverless Devs，需先改 s.yaml 中的 image
+```
+
 ---
 
 ## 📋 数据更新机制
